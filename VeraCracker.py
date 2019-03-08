@@ -19,8 +19,8 @@ from datetime import datetime
 # Constants
 VeraWinPath = '"c:\\Program Files\\VeraCrypt\\VeraCrypt.exe"'
 VeraWinAttributes = ' /v "%s" /q /p "%s" /s /l %s'
-VeraWinProcList = "query process"
-VeraWinProcName = "veracrypt.exe"
+VeraWinProcList = "tasklist"
+VeraWinProcName = "VeraCrypt.exe"
 VeraMacPath = '/Applications/VeraCrypt.app/Contents/MacOS/VeraCrypt'
 VeraLinuxPath = 'veracrypt'
 VeraLinuxAttributes = ' -t %s -p %s --non-interactive'
@@ -61,13 +61,17 @@ def checkRequirements():
             pass
 
 
-def windowsCrack(p, veracryptPath):
-    os.popen(veracryptPath + VeraWinAttributes % (args.v, p, args.m))
+def veraWinCmd(cmd):
+    os.popen(veracryptPath + cmd)
     while True:
         if isVeraRunning():
             time.sleep(0.1)
         else:
             break
+
+
+def windowsCrack(p, veracryptPath):
+    veraWinCmd(VeraWinAttributes % (args.v, p, args.m))
     try:
         os.chdir("%s:" % args.m)
         return True
@@ -122,6 +126,8 @@ if __name__ == '__main__':
                         help='Output file for untried passwords on quit')
     parser.add_argument('-b', metavar='file', type=str,
                         help='Path to the VeraCrypt binary')
+    parser.add_argument('-f', action='store_true',
+                        help='Unmount Mountpoint before execution')
     args = parser.parse_args()
 
     # Get VeraCypt binary path
@@ -140,11 +146,14 @@ if __name__ == '__main__':
     if args.b:
         veracryptPath = args.b
 
+    if platform.system() == "Windows" and args.f:
+        veraWinCmd(' /dismount %s /q /s' % args.m)
+
     # Check script requirements
     checkRequirements()
 
     # Get wordlist
-    wordlist = [x.strip() for x in open(args.p, 'r')] if args.p else [
+    wordlist = [x.strip() for x in open(args.p, 'r') if x.strip()] if args.p else [
         line.strip() for line in fileinput.input()]
 
     # Time to test
@@ -153,6 +162,7 @@ if __name__ == '__main__':
     startTime = datetime.now()
     try:
         for p in progressbar(wordlist):
+            tried += 1
             if args.d:
                 print("[-] Trying %s" % p)
             if crack(p, veracryptPath):
@@ -160,7 +170,6 @@ if __name__ == '__main__':
                 printResults(startTime, tried)
                 sys.exit(0)
             wlCopy.pop(0)
-            tried += 1
         print("Password not found")
         printResults(startTime, tried)
     except KeyboardInterrupt:
